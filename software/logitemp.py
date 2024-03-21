@@ -203,7 +203,7 @@ def main():
     ws2812b.start_pulsating(colorRGB=(0,255,0), start_intensity=5, stop_intensity=25, frequency=0.5)
  
     # Connect to WiFi network
-    wifi_connection = WiFiConnection('xx', 'yy')
+    wifi_connection = WiFiConnection('xxx', 'yyy')
     wifi_connection.connect()
     
     print("Starting web server")
