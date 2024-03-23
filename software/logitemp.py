@@ -2,6 +2,7 @@ from machine import Pin             # Import Pin class from machine module
 from onewire import OneWire         # Import OneWire class from onewire module
 from ds18x20 import DS18X20         # Import DS18X20 class from ds18x20 module
 from neopixel import NeoPixel       # Import NeoPixel class from neopixel module
+import uasyncio as asyncio          # Import asyncio module
 import _thread                      # Import _thread module
 import usocket                      # Import usocket module
 import math                         # Import math module
@@ -20,11 +21,13 @@ class WS2812B:
     def __init__(self, port, num_leds, color=(255, 255, 255)):
         self.np = NeoPixel(Pin(port), num_leds)
         self.pulsating = False
-        self.t = 0
         self.color = color
         
     def set_color(self, led_index, color):
         self.np[led_index] = color
+        #self.np.write() # Is probably interrupted hanging the code... thread issue
+        
+    def write(self):
         self.np.write()
 
     def clear(self):
@@ -100,6 +103,8 @@ class DS18x20:
             data = self.get_temperatures()
             if data != old_data:
                 print(data)
+            else:
+                print("No new data")
             old_data = data
             time.sleep(1)
             
@@ -144,16 +149,17 @@ class WiFiConnection:
         print('network config:', self.sta_if.ifconfig())
 
 class WebServer:
-    def __init__(self, port=80):
+    def __init__(self, sensor, port=80):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(('', port))
         self.socket.listen(5)
         self.socket.setblocking(False)
         self.inputs = [self.socket]
+        self.sensor = sensor  # Store the sensor object
         
     def serve(self):
         _thread.start_new_thread(self.webserver, ())
-
+        
     def webserver(self):
         while True:
             readable, _, _ = select.select(self.inputs, [], [])
@@ -167,15 +173,13 @@ class WebServer:
                     request = s.recv(1024)
                     if request:
                         print('Content = %s' % str(request))
-                        # Send HTTP response
-                        response_body = """
-                                        <html>
-                                        <body>
-                                        <h1>ESP32C6 running micropython for wirless probes!</h1>
-                                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/INFICON-Corporate-Logo-2-Color.png/1200px-INFICON-Corporate-Logo-2-Color.png" alt="LOGO">
-                                        </body>
-                                        </html>
-                                        """
+                        # Prepare the HTML body with temperature data
+                        response_body = "<html><body><h1>Logitemp</h1>"
+                        data = json.loads(self.sensor.get_temperatures())
+                        for item in data:
+                            response_body += "<p>Port: {}, Temp: {}, Serial: {}</p>".format(item['port'], item['temp'], item['serial'])
+                        response_body += "</body></html>"
+                        
                         response_headers = {
                             'Content-Type': 'text/html',
                             'Content-Length': len(response_body),
@@ -196,22 +200,17 @@ class WebServer:
 
 # Main function 
 def main():
+    print("Connecting to Wifi network...")
+    # Connect to WiFi network
+    wifi_connection = WiFiConnection('Happy Wifi Happy Lifi', 'MoaIdaLifi#0812!')
+    wifi_connection.connect()
+    
     # Create an instance of WS2812B class with red color and start intensity 0 and stop intensity 10
     ws2812b = WS2812B(8, 1, (0, 255, 0))  # Assuming the strip is connected to port 8 and has 1 LED
     
     # Start pulsating the first LED
     ws2812b.start_pulsating(colorRGB=(0,255,0), start_intensity=5, stop_intensity=25, frequency=0.5)
- 
-    # Connect to WiFi network
-    wifi_connection = WiFiConnection('xxx', 'yyy')
-    wifi_connection.connect()
-    
-    print("Starting web server")
-
-    # Create and start the web server
-    web_server = WebServer()
-    #web_server.serve()
-    
+        
     print("Starting DS18x20 sensor")
     
      # Initialize sensor class with the list of ports where DS18X20 devices are connected
@@ -220,6 +219,12 @@ def main():
 
     # Start the sensor data collection and printing to console
     sensor.start()
+    
+    print("Starting web server")
+
+    # Create and start the web server
+    web_server = WebServer(sensor)
+    web_server.serve()
     
     print("Starting socket server")
 
@@ -230,7 +235,9 @@ def main():
     print("Starting main loop")
     
     while True:
-         time.sleep(100)  # Use calculated delay  
+        time.sleep(0.005)
+        ws2812b.write()
+    
         
 if __name__ == "__main__":
     main()

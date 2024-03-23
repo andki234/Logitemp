@@ -1,0 +1,2 @@
+esptool --port COM4 erase_flash
+esptool --chip esp32-c6 --port COM4 write_flash -z 0x0 micropython-full-image-8M.bin
