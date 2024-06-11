@@ -132,14 +132,33 @@ class DS18x20:
             except Exception as e:
                 print('Error handling connection:', e)
                 client_socket.close()  # Close the client socket when an error occurs
-
+                
+                
 class WiFiConnection:
-    def __init__(self, ssid, password):
-        self.ssid = ssid
-        self.password = password
-        self.sta_if = network.WLAN(network.STA_IF)
+    """
+    WiFiConnection constructor.
+
+    Loads the WiFi SSID and password from the config.json file.
+    sets up the WLAN interface and stores it in the sta_if attribute.
+    """
+
+    def __init__(self):
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+            self.ssid = config['wifi_ssid']
+            self.password = config['wifi_password']
+            self.sta_if = network.WLAN(network.STA_IF)
 
     def connect(self):
+        """
+        Connects to the WiFi network.
+
+        If the WLAN interface is not already connected, it activates the interface,
+        connects to the network using the provided SSID and password, and waits until
+        the connection is established.
+
+        Prints the network configuration once the connection is established.
+        """
         if not self.sta_if.isconnected():
             print('connecting to network...')
             self.sta_if.active(True)
@@ -202,9 +221,9 @@ class WebServer:
 def main():
     print("Connecting to Wifi network...")
     # Connect to WiFi network
-    wifi_connection = WiFiConnection('Happy Wifi Happy Lifi', 'MoaIdaLifi#0812!')
+    wifi_connection = WiFiConnection() # Reading wifi SSID, PASSWORD data from config.json
     wifi_connection.connect()
-    
+        
     # Create an instance of WS2812B class with red color and start intensity 0 and stop intensity 10
     ws2812b = WS2812B(8, 1, (0, 255, 0))  # Assuming the strip is connected to port 8 and has 1 LED
     
